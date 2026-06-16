@@ -1,0 +1,7 @@
+.build/
+build/
+SwiftTrigger.app/
+.claude/
+.DS_Store
+*.o
+*.d

@@ -1,0 +1,33 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app bundle
+        run: bash build_app.sh
+
+      - name: Zip artifact
+        run: zip -r SwiftTrigger.zip build/SwiftTrigger.app
+
+      # PR 只验证能否编译，不发布 Release
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.${{ github.run_number }}
+          name: "v0.${{ github.run_number }}"
+          files: SwiftTrigger.zip
+          generate_release_notes: true
