@@ -43,13 +43,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         item.button?.image = icon
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "打开 SwiftTrigger",
+        menu.addItem(NSMenuItem(title: "打开快捷触发器",
                                 action: #selector(showMainWindow),
                                 keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "退出 SwiftTrigger",
+        menu.addItem(NSMenuItem(title: "退出",
                                 action: #selector(quit),
                                 keyEquivalent: "q"))
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "卸载并清除所有数据…",
+                                action: #selector(uninstall),
+                                keyEquivalent: ""))
         item.menu = menu
         statusItem = item
     }
@@ -73,6 +77,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func quit() {
+        NSApp.terminate(nil)
+    }
+
+    @objc private func uninstall() {
+        let alert = NSAlert()
+        alert.messageText = "卸载快捷触发器"
+        alert.informativeText = "将清除所有规则、日志和偏好设置，并移除开机自启。\n\n清除后请手动将「快捷触发器.app」拖入废纸篓。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "清除并退出")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        try? SMAppService.mainApp.unregister()
+
+        let fm = FileManager.default
+        let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("SwiftTrigger")
+        try? fm.removeItem(at: support)
+
+        let logs = fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Logs/SwiftTrigger.log")
+        try? fm.removeItem(at: logs)
+
+        UserDefaults.standard.removePersistentDomain(forName: "com.swifttrigger.app")
+
         NSApp.terminate(nil)
     }
 
