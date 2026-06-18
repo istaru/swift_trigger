@@ -6,6 +6,16 @@ class BatteryMonitor {
 
     var onBatteryChanged: ((Int, Bool) -> Void)?
 
+    /// 电源状态读取来源。默认读真实硬件，测试可注入桩。
+    lazy var statusProvider: () -> (percentage: Int, isCharging: Bool)? = { [weak self] in
+        self?.currentStatus()
+    }
+
+    /// 启动基线读数失败时的重试间隔与最大次数。
+    /// 开机自启时 IOKit 电源信息可能尚未就绪，单次读取会拿到 nil，需重试兜底。
+    var baselineRetryInterval: TimeInterval = 0.5
+    var baselineMaxRetries: Int = 20
+
     private var runLoopSource: CFRunLoopSource?
 
     func start() {
@@ -19,8 +29,21 @@ class BatteryMonitor {
             CFRunLoopAddSource(CFRunLoopGetMain(), src, .defaultMode)
         }
 
-        // 启动时主动读一次，建立基线（引擎据此把首次事件视为基线、不触发插拔类规则）
-        handleChange()
+        // 启动时主动建立基线。若电源信息尚未就绪（读到 nil），定时重试，
+        // 否则"开机即低于阈值且电量不再变化"的场景会因为没有后续事件而永不触发。
+        readBaseline(attempt: 0)
+    }
+
+    /// 读取启动基线；读到 nil 时按 baselineRetryInterval 重试，最多 baselineMaxRetries 次。
+    func readBaseline(attempt: Int) {
+        if let (pct, charging) = statusProvider() {
+            onBatteryChanged?(pct, charging)
+            return
+        }
+        guard attempt < baselineMaxRetries else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + baselineRetryInterval) { [weak self] in
+            self?.readBaseline(attempt: attempt + 1)
+        }
     }
 
     func stop() {
@@ -49,7 +72,7 @@ class BatteryMonitor {
     }
 
     private func handleChange() {
-        guard let (pct, charging) = currentStatus() else { return }
+        guard let (pct, charging) = statusProvider() else { return }
         onBatteryChanged?(pct, charging)
     }
 }

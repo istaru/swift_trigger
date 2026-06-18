@@ -14,6 +14,11 @@ let package = Package(
                 .linkedFramework("SystemConfiguration"),
                 .linkedFramework("ServiceManagement"),
             ]
+        ),
+        .testTarget(
+            name: "SwiftTriggerTests",
+            dependencies: ["SwiftTrigger"],
+            path: "Tests/SwiftTriggerTests"
         )
     ]
 )
