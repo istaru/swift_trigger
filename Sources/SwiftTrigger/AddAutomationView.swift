@@ -14,38 +14,9 @@ private struct VoiceOption: Identifiable {
 struct AddAutomationView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store = AutomationStore.shared
+    @StateObject private var draft: AutomationDraft
 
-    // 正在编辑的规则；为 nil 表示新建
     private let editing: Automation?
-
-    // Common
-    @State private var name = ""
-    @State private var triggerType: TriggerTypeOption = .battery
-
-    // Battery
-    @State private var batteryCondition: BatteryTrigger.Condition = .below
-    @State private var batteryPct = 20
-
-    // Time
-    @State private var timeHour = 9
-    @State private var timeMinute = 0
-
-    // WiFi
-    @State private var wifiCondition: WiFiTrigger.Condition = .connected
-    @State private var wifiName = ""
-
-    // App
-    @State private var appCondition: AppTrigger.Condition = .opened
-    @State private var appBundleID = ""
-    @State private var appName = ""
-
-    // Notification
-    @State private var notifTitle = ""
-    @State private var notifBody = ""
-
-    // Speech (battery only)
-    @State private var speechText = ""
-    @State private var speechVoice = ""
 
     private static let availableVoices: [VoiceOption] = {
         NSSpeechSynthesizer.availableVoices
@@ -58,49 +29,9 @@ struct AddAutomationView: View {
             }.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }()
 
-    enum TriggerTypeOption: String, CaseIterable {
-        case battery = "电源"
-        case time    = "时间"
-        case wifi    = "Wi-Fi"
-        case app     = "应用程序"
-
-        var icon: String {
-            switch self {
-            case .battery: return "battery.50"
-            case .time:    return "clock"
-            case .wifi:    return "wifi"
-            case .app:     return "app.badge"
-            }
-        }
-    }
-
     init(editing: Automation? = nil) {
         self.editing = editing
-        guard let a = editing else { return }
-        _name = State(initialValue: a.name)
-        _notifTitle = State(initialValue: a.notificationTitle)
-        _notifBody = State(initialValue: a.notificationBody)
-        _speechText = State(initialValue: a.speechText ?? "")
-        _speechVoice = State(initialValue: a.speechVoice ?? "")
-        switch a.trigger {
-        case .battery(let t):
-            _triggerType = State(initialValue: .battery)
-            _batteryCondition = State(initialValue: t.condition)
-            _batteryPct = State(initialValue: t.percentage)
-        case .time(let t):
-            _triggerType = State(initialValue: .time)
-            _timeHour = State(initialValue: t.hour)
-            _timeMinute = State(initialValue: t.minute)
-        case .wifi(let t):
-            _triggerType = State(initialValue: .wifi)
-            _wifiCondition = State(initialValue: t.condition)
-            _wifiName = State(initialValue: t.networkName)
-        case .app(let t):
-            _triggerType = State(initialValue: .app)
-            _appCondition = State(initialValue: t.condition)
-            _appBundleID = State(initialValue: t.bundleIdentifier)
-            _appName = State(initialValue: t.appName)
-        }
+        _draft = StateObject(wrappedValue: AutomationDraft(editing: editing))
     }
 
     var body: some View {
@@ -111,7 +42,7 @@ struct AddAutomationView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     nameSection
                     triggerSection
-                    if triggerType == .battery {
+                    if draft.triggerType == .battery {
                         speechSection
                     } else {
                         notifSection
@@ -121,10 +52,10 @@ struct AddAutomationView: View {
             }
         }
         .frame(width: 500, height: 540)
-        .onChange(of: triggerType)      { _ in suggestNotif() }
-        .onChange(of: batteryCondition) { _ in suggestNotif() }
-        .onChange(of: batteryPct)       { _ in suggestNotif() }
-        .onChange(of: speechVoice)      { _ in previewVoice() }
+        .onChange(of: draft.triggerType)      { _ in draft.suggestNotif() }
+        .onChange(of: draft.batteryCondition) { _ in draft.suggestNotif() }
+        .onChange(of: draft.batteryPct)       { _ in draft.suggestNotif() }
+        .onChange(of: draft.speechVoice)      { _ in previewVoice() }
     }
 
     // MARK: - Header
@@ -136,7 +67,7 @@ struct AddAutomationView: View {
             Text(editing == nil ? "新建自动化" : "编辑自动化").font(.headline)
             Spacer()
             Button("完成") { save() }
-                .disabled(!isValid)
+                .disabled(!draft.isValid)
                 .buttonStyle(.borderedProminent)
         }
         .padding()
@@ -146,15 +77,15 @@ struct AddAutomationView: View {
 
     private var nameSection: some View {
         sectionView(title: "名称") {
-            TextField("自动化名称", text: $name)
+            TextField("自动化名称", text: $draft.name)
                 .textFieldStyle(.roundedBorder)
         }
     }
 
     private var triggerSection: some View {
         sectionView(title: "触发条件") {
-            Picker("", selection: $triggerType) {
-                ForEach(TriggerTypeOption.allCases, id: \.self) { opt in
+            Picker("", selection: $draft.triggerType) {
+                ForEach(AutomationDraft.TriggerTypeOption.allCases, id: \.self) { opt in
                     Label(opt.rawValue, systemImage: opt.icon).tag(opt)
                 }
             }
@@ -162,7 +93,7 @@ struct AddAutomationView: View {
             .labelsHidden()
 
             Group {
-                switch triggerType {
+                switch draft.triggerType {
                 case .battery: batteryConfig
                 case .time:    timeConfig
                 case .wifi:    wifiConfig
@@ -177,21 +108,21 @@ struct AddAutomationView: View {
 
     private var notifSection: some View {
         sectionView(title: "通知内容") {
-            TextField("通知标题", text: $notifTitle)
+            TextField("通知标题", text: $draft.notifTitle)
                 .textFieldStyle(.roundedBorder)
-            TextField("通知正文", text: $notifBody)
+            TextField("通知正文", text: $draft.notifBody)
                 .textFieldStyle(.roundedBorder)
         }
     }
 
     private var speechSection: some View {
         sectionView(title: "语音内容") {
-            TextField("触发时电脑朗读的内容", text: $speechText)
+            TextField("触发时电脑朗读的内容", text: $draft.speechText)
                 .textFieldStyle(.roundedBorder)
             HStack(spacing: 8) {
                 Text("语音角色")
                     .foregroundColor(.secondary)
-                Picker("", selection: $speechVoice) {
+                Picker("", selection: $draft.speechVoice) {
                     Text("系统默认").tag("")
                     Divider()
                     ForEach(Self.availableVoices) { voice in
@@ -209,8 +140,100 @@ struct AddAutomationView: View {
         }
     }
 
+    // MARK: - Trigger Config Views
+
+    @ViewBuilder
+    private var batteryConfig: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("条件", selection: $draft.batteryCondition) {
+                ForEach(BatteryTrigger.Condition.allCases, id: \.self) { c in
+                    Text(c.rawValue).tag(c)
+                }
+            }
+            .pickerStyle(.radioGroup)
+
+            if draft.batteryCondition == .below || draft.batteryCondition == .reaches {
+                HStack {
+                    Text("电量")
+                    Slider(value: Binding(
+                        get: { Double(draft.batteryPct) },
+                        set: { draft.batteryPct = Int($0) }
+                    ), in: 1...100, step: 1)
+                    Text("\(draft.batteryPct)%")
+                        .monospacedDigit()
+                        .frame(width: 38)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var timeConfig: some View {
+        HStack(spacing: 8) {
+            Text("每天")
+            Picker("时", selection: $draft.timeHour) {
+                ForEach(0..<24, id: \.self) { h in
+                    Text(String(format: "%02d", h)).tag(h)
+                }
+            }
+            .frame(width: 64)
+            Text(":")
+            Picker("分", selection: $draft.timeMinute) {
+                ForEach(stride(from: 0, through: 55, by: 5).map { $0 }, id: \.self) { m in
+                    Text(String(format: "%02d", m)).tag(m)
+                }
+            }
+            .frame(width: 64)
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var wifiConfig: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("条件", selection: $draft.wifiCondition) {
+                ForEach(WiFiTrigger.Condition.allCases, id: \.self) { c in
+                    Text(c.rawValue).tag(c)
+                }
+            }
+            .pickerStyle(.radioGroup)
+            TextField("Wi-Fi 名称（SSID）", text: $draft.wifiName)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    @ViewBuilder
+    private var appConfig: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("条件", selection: $draft.appCondition) {
+                ForEach(AppTrigger.Condition.allCases, id: \.self) { c in
+                    Text(c.rawValue).tag(c)
+                }
+            }
+            .pickerStyle(.radioGroup)
+            HStack {
+                TextField("应用程序名称", text: $draft.appName)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(true)
+                Button("选择应用…") { pickApp() }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func sectionView<C: View>(title: String, @ViewBuilder content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+            content()
+        }
+    }
+
     private func previewVoice() {
-        let voice = Self.availableVoices.first { $0.name == speechVoice }
+        let voice = Self.availableVoices.first { $0.name == draft.speechVoice }
         let intro = voice.map { introText(name: $0.name, locale: $0.locale) }
             ?? "Hello, I am the default voice on your Mac."
         let task = Process()
@@ -250,129 +273,6 @@ struct AddAutomationView: View {
         }
     }
 
-    // MARK: - Trigger Config Views
-
-    @ViewBuilder
-    private var batteryConfig: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("条件", selection: $batteryCondition) {
-                ForEach(BatteryTrigger.Condition.allCases, id: \.self) { c in
-                    Text(c.rawValue).tag(c)
-                }
-            }
-            .pickerStyle(.radioGroup)
-
-            if batteryCondition == .below || batteryCondition == .reaches {
-                HStack {
-                    Text("电量")
-                    Slider(value: Binding(
-                        get: { Double(batteryPct) },
-                        set: { batteryPct = Int($0) }
-                    ), in: 1...100, step: 1)
-                    Text("\(batteryPct)%")
-                        .monospacedDigit()
-                        .frame(width: 38)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var timeConfig: some View {
-        HStack(spacing: 8) {
-            Text("每天")
-            Picker("时", selection: $timeHour) {
-                ForEach(0..<24, id: \.self) { h in
-                    Text(String(format: "%02d", h)).tag(h)
-                }
-            }
-            .frame(width: 64)
-            Text(":")
-            Picker("分", selection: $timeMinute) {
-                ForEach(stride(from: 0, through: 55, by: 5).map { $0 }, id: \.self) { m in
-                    Text(String(format: "%02d", m)).tag(m)
-                }
-            }
-            .frame(width: 64)
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private var wifiConfig: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("条件", selection: $wifiCondition) {
-                ForEach(WiFiTrigger.Condition.allCases, id: \.self) { c in
-                    Text(c.rawValue).tag(c)
-                }
-            }
-            .pickerStyle(.radioGroup)
-            TextField("Wi-Fi 名称（SSID）", text: $wifiName)
-                .textFieldStyle(.roundedBorder)
-        }
-    }
-
-    @ViewBuilder
-    private var appConfig: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("条件", selection: $appCondition) {
-                ForEach(AppTrigger.Condition.allCases, id: \.self) { c in
-                    Text(c.rawValue).tag(c)
-                }
-            }
-            .pickerStyle(.radioGroup)
-            HStack {
-                TextField("应用程序名称", text: $appName)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(true)
-                Button("选择应用…") { pickApp() }
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func sectionView<C: View>(title: String, @ViewBuilder content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-            content()
-        }
-    }
-
-    private var isValid: Bool {
-        guard !name.isEmpty && triggerIsValid else { return false }
-        return triggerType == .battery ? !speechText.isEmpty : !notifTitle.isEmpty
-    }
-
-    private var triggerIsValid: Bool {
-        switch triggerType {
-        case .battery, .time: return true
-        case .wifi:           return !wifiName.isEmpty
-        case .app:            return !appBundleID.isEmpty
-        }
-    }
-
-    private func suggestNotif() {
-        guard notifTitle.isEmpty, notifBody.isEmpty else { return }
-        switch triggerType {
-        case .battery:
-            switch batteryCondition {
-            case .below:
-                notifTitle = "电量过低"; notifBody = "当前电量 \(batteryPct)%，请尽快充电"
-            case .reaches:
-                notifTitle = "充电完成"; notifBody = "电量已达到 \(batteryPct)%"
-            case .chargerConnected:
-                notifTitle = "充电器已插入"; notifBody = "开始充电"
-            case .chargerDisconnected:
-                notifTitle = "充电器已拔出"; notifBody = "已断开充电"
-            }
-        default: break
-        }
-    }
-
     private func pickApp() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.application]
@@ -381,33 +281,15 @@ struct AddAutomationView: View {
         panel.canChooseDirectories = false
 
         if panel.runModal() == .OK, let url = panel.url {
-            appBundleID = Bundle(url: url)?.bundleIdentifier ?? ""
-            appName = url.deletingPathExtension().lastPathComponent
+            draft.appBundleID = Bundle(url: url)?.bundleIdentifier ?? ""
+            draft.appName = url.deletingPathExtension().lastPathComponent
         }
     }
 
     private func save() {
-        let trigger: TriggerConfig
-        switch triggerType {
-        case .battery:
-            trigger = .battery(BatteryTrigger(condition: batteryCondition, percentage: batteryPct))
-        case .time:
-            trigger = .time(TimeTrigger(hour: timeHour, minute: timeMinute))
-        case .wifi:
-            trigger = .wifi(WiFiTrigger(condition: wifiCondition, networkName: wifiName))
-        case .app:
-            trigger = .app(AppTrigger(condition: appCondition, bundleIdentifier: appBundleID, appName: appName))
-        }
-
-        let automation = Automation(
-            id: editing?.id ?? UUID(),
-            name: name,
-            isEnabled: editing?.isEnabled ?? true,
-            trigger: trigger,
-            notificationTitle: notifTitle,
-            notificationBody: notifBody,
-            speechText: triggerType == .battery ? speechText : nil,
-            speechVoice: triggerType == .battery && !speechVoice.isEmpty ? speechVoice : nil
+        let automation = draft.build(
+            editingID: editing?.id,
+            editingIsEnabled: editing?.isEnabled ?? true
         )
         if editing == nil {
             store.add(automation)

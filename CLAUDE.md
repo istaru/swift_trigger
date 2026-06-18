@@ -141,3 +141,19 @@ open /Applications/SwiftTrigger.app
 - 更多触发器（屏幕锁定/解锁、蓝牙设备连接、外接显示器等）
 - 更多动作类型（运行 Shortcut、执行脚本、HTTP 请求等）
 - 复合条件（多触发器组合 / 条件判断）
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`github.com/istaru/swift_trigger`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary (needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

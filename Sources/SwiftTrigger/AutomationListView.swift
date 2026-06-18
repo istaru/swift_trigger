@@ -89,39 +89,7 @@ struct AutomationRow: View {
         .padding(.vertical, 4)
     }
 
-    private var iconName: String {
-        switch automation.trigger {
-        case .battery: return "battery.50"
-        case .time:    return "clock.fill"
-        case .wifi:    return "wifi"
-        case .app:     return "app.badge.fill"
-        }
-    }
-
-    private var iconColor: Color {
-        switch automation.trigger {
-        case .battery: return .green
-        case .time:    return .blue
-        case .wifi:    return .indigo
-        case .app:     return .orange
-        }
-    }
-
-    private var triggerSummary: String {
-        switch automation.trigger {
-        case .battery(let t):
-            switch t.condition {
-            case .below:               return "电量低于 \(t.percentage)%"
-            case .reaches:             return "电量达到 \(t.percentage)%"
-            case .chargerConnected:    return "充电器已插入"
-            case .chargerDisconnected: return "充电器已拔出"
-            }
-        case .time(let t):
-            return "每天 \(t.displayTime)"
-        case .wifi(let t):
-            return t.condition == .connected ? "连接到「\(t.networkName)」" : "断开「\(t.networkName)」"
-        case .app(let t):
-            return "\(t.appName) \(t.condition.rawValue)"
-        }
-    }
+    private var iconName: String    { automation.trigger.iconName }
+    private var iconColor: Color    { automation.trigger.iconColor }
+    private var triggerSummary: String { automation.trigger.summary }
 }
