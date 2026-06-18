@@ -2,7 +2,7 @@
 set -e
 
 EXEC="SwiftTrigger"        # 可执行文件名（必须 ASCII，与 CFBundleExecutable 一致）
-APP_NAME="快触发器"         # .app 包显示名
+APP_NAME="快捷触发"         # .app 包显示名
 BUILD="build"
 APP_DIR="$BUILD/$APP_NAME.app/Contents"
 

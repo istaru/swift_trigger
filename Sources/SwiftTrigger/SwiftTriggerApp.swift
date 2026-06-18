@@ -43,7 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         item.button?.image = icon
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "打开快触发器",
+        menu.addItem(NSMenuItem(title: "打开快捷触发",
                                 action: #selector(showMainWindow),
                                 keyEquivalent: ""))
         menu.addItem(.separator())
@@ -62,7 +62,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if window == nil {
             let hosting = NSHostingController(rootView: ContentView())
             let win = NSWindow(contentViewController: hosting)
-            win.title = "快触发器"
+            win.title = "快捷触发"
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             win.setContentSize(NSSize(width: 760, height: 520))
             win.center()
@@ -82,8 +82,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func uninstall() {
         let alert = NSAlert()
-        alert.messageText = "卸载快触发器"
-        alert.informativeText = "将清除所有规则、日志和偏好设置，并移除开机自启。\n\n清除后请手动将「快触发器.app」拖入废纸篓。"
+        alert.messageText = "卸载快捷触发"
+        alert.informativeText = "将清除所有规则、日志和偏好设置，并移除开机自启。\n\n清除后请手动将「快捷触发.app」拖入废纸篓。"
         alert.alertStyle = .warning
         alert.addButton(withTitle: "清除并退出")
         alert.addButton(withTitle: "取消")

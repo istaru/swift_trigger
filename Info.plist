@@ -5,9 +5,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.swifttrigger.app</string>
     <key>CFBundleName</key>
-    <string>快触发器</string>
+    <string>快捷触发</string>
     <key>CFBundleDisplayName</key>
-    <string>快触发器</string>
+    <string>快捷触发</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleVersion</key>
